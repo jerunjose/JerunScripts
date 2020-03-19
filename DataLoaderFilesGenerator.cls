@@ -1,5 +1,4 @@
 public class DataLoaderFilesGenerator {
-	C:\Users\jerun\dataloader\v48.0.0
 	public static String rootFolderForAllFiles = 'c:\\Users\\jerun\\dataloader\\v48.0.0\\downloaded-content\\';
     public static String extractJobSuffix = '_Extract';
 	public static String insertJobSuffix = '_Insert';
