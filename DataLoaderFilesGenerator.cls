@@ -1,5 +1,6 @@
 public class DataLoaderFilesGenerator {
-	public static String rootFolderForAllFiles = 'c:\\dataloader\\samples\\data\\';
+	C:\Users\jerun\dataloader\v48.0.0
+	public static String rootFolderForAllFiles = 'c:\\Users\\jerun\\dataloader\\v48.0.0\\downloaded-content\\';
     public static String extractJobSuffix = '_Extract';
 	public static String insertJobSuffix = '_Insert';
 	public static String updateJobSuffix = '_Update';
@@ -34,7 +35,7 @@ public class DataLoaderFilesGenerator {
 		// Create the bean for extract job
 		String extractJobName = String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+extractJobSuffix;
 		dataLoaderJobNames.add(extractJobName);
-		String extractFileName = rootFolderForAllFiles+extractJobName+'.csv';
+		String extractFileName = extractJobName+'.csv';
 		String SOQLQueryWithFilters = opr.SOQLQuery + (ds.filterString == null ? '' : (' WHERE '+ds.filterString));
 		String extractJobBean = prepareExtractBean(extractJobName, ds.objAPIName, SOQLQueryWithFilters, extractFileName);
 		beansForDatSet+= extractJobBean;
@@ -77,7 +78,7 @@ public class DataLoaderFilesGenerator {
         processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvWrite"/>';
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.extractionSOQL" value="'+SOQLQuery+'"/>';
-        processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+FileName+'"/>';
+        processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+rootFolderForAllFiles+FileName+'"/>';
         processConfFile = closeBean(processConfFile);
         return processConfFile;
     }
@@ -88,8 +89,8 @@ public class DataLoaderFilesGenerator {
         processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvRead"/>';
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.externalIdField" value="'+externalIdField+'"/>';
-        processConfFile+= '\n\t\t\t\t<entry key="process.mappingFile" value="'+mappingFileName+'"/>';
-        processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+loadFileName+'"/>';
+        processConfFile+= '\n\t\t\t\t<entry key="process.mappingFile" value="'+rootFolderForAllFiles+mappingFileName+'"/>';
+        processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+rootFolderForAllFiles+loadFileName+'"/>';
         processConfFile = closeBean(processConfFile);
         return processConfFile;
     }
