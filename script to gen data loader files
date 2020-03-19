@@ -1,3 +1,52 @@
+class objectProcessResults{
+	String SOQLQuery;
+	String mappingFileForCreate;
+	String mappingFileForUpdate;
+}
+
+private void showSomething(something st){
+    system.debug(st.textHere);
+}
+
+String openBean(String jobName){
+	String processConfFile = '';
+	processConfFile+= '\n\t<bean id="'+jobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
+	processConfFile+= '\n\t\t<property name="name" value="'+jobName+'"/>';
+	processConfFile+= '\n\t\t<property name="configOverrideMap">';
+	processConfFile+= '\n\t\t\t<map>';
+	return processConfFile;
+}
+
+String closeBean(String processConfFile){
+	processConfFile+= '\n\t\t\t</map>';
+	processConfFile+= '\n\t\t</property>';
+	processConfFile+= '\n\t</bean>';
+	return processConfFile;
+}
+
+String prepareExtractBean(String jobName, String objAPIName, String SOQLQuery, String FileName){
+	String processConfFile = openBean(jobName);
+	processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="extract"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvWrite"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="sfdc.extractionSOQL" value="'+SOQLQuery+'"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+FileName+'"/>';
+	processConfFile = closeBean(processConfFile);
+	return processConfFile;
+}
+	
+String prepareUpsertBean(String jobName, String objAPIName, String sandboxIdField, String mappingFileName, String loadFileName){
+	String processConfFile = openBean(jobName);
+	processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="upsert"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvRead"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="sfdc.externalIdField" value="'+sandboxIdField+'"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="process.mappingFile" value="'+mappingFileName+'"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+loadFileName+'"/>';
+	processConfFile = closeBean(processConfFile);
+	return processConfFile;
+}
+
 set<String> setUpObjects = new set<String>();
 // Not adding user object as portal users don't get carried over. These would also need to be loaded with external ids
 //setUpObjects.add('User');
@@ -11,19 +60,16 @@ objectsToLoad.add('Contact');
 objectsToLoad.add('User');
 objectsToLoad.add('Client_Endorsement__c');
 //objectsToLoad.removeAll(objectsLoaded);
-String sandboxIdField = 'Sandbox_Migration_Id__c';
+String sandboxIdField = 'Record_Id_from_production__c';
 
 // Variables to hold the process results
-map<String, String> objToQueryString = new map<String, String>();
-map<String, String> objToCreateMappingFile = new map<String, String>();
-map<String, String> objToUpdateMappingFile = new map<String, String>();
+map<String, objectProcessResults> objProcessResultsMap = new map<String, objectProcessResults>();
 // Begin processing
 for(String objAPIName : objectsToLoad){
 	Map<String, Schema.SObjectField> fieldMap = Schema.describeSObjects(new String[]{objAPIName})[0].fields.getMap();
 	set<String> createFields = new set<String>();
 	set<String> upsertFields = new set<String>();
 	set<String> queryFields = new set<String>();
-	//fieldMap.remove(sandboxIdField);
 	for( String fieldName : fieldMap.KeySet() ) {
 		Schema.SObjectField fld = fieldMap.get(fieldName);
 		Schema.DescribeFieldResult dfr = fld.getDescribe();
@@ -40,6 +86,7 @@ for(String objAPIName : objectsToLoad){
 			}
 		}
 	}
+	createFields.remove(sandboxIdField);
 
 	// Generate the SOQL String
 	queryFields.addAll(createFields);
@@ -84,11 +131,14 @@ for(String objAPIName : objectsToLoad){
 		}
 	}
 
+	objectProcessResults opr = new objectProcessResults();
+	opr.SOQLQuery = SOQLQuery;
+	opr.mappingFileForCreate = mappingFileForCreate;
+	opr.mappingFileForUpdate = mappingFileForUpdate;
+	objProcessResultsMap.put(objAPIName, opr);
+
 	// All the processing for this object is done. Lets mark it as complete.
 	// This would mean that any reference to this object can be marked in the insert jobs.
-	objToQueryString.put(objAPIName, SOQLQuery);
-	objToCreateMappingFile.put(objAPIName, mappingFileForCreate);
-	objToUpdateMappingFile.put(objAPIName, mappingFileForUpdate);
 	objectsProcessed.add(objAPIName);
 	
 	// When user records have been processed, it is safe to perform polymorphic lookups for user and queue objects
@@ -108,69 +158,39 @@ String extractJobPrefix = 'Extract_';
 String createJobPrefix = 'Create_';
 String updateJobPrefix = 'Update_';
 for(String objAPIName : objectsToLoad){
+	objectProcessResults opr = objProcessResultsMap.get(objAPIName);
 	// Create the bean for extract job
-	String SOQLQuery = objToQueryString.get(objAPIName);
 	String extractJobName = extractJobPrefix+objAPIName;
-	processConfFile+= '\n\t<bean id="'+extractJobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
-	processConfFile+= '\n\t\t<property name="name" value="'+extractJobName+'"/>';
-	processConfFile+= '\n\t\t<property name="configOverrideMap">';
-	processConfFile+= '\n\t\t\t<map>';
-	processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="extract"/>';
-	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvWrite"/>';
-	processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
-	processConfFile+= '\n\t\t\t\t<entry key="sfdc.extractionSOQL" value="'+SOQLQuery+'"/>';
-	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+rootFolderForAllFiles+extractJobName+'.csv"/>';
-	processConfFile+= '\n\t\t\t</map>';
-	processConfFile+= '\n\t\t</property>';
-	processConfFile+= '\n\t</bean>';
-    
+	String extractFileName = rootFolderForAllFiles+extractJobName+'.csv';
+	String extractJobBean = prepareExtractBean(extractJobName, objAPIName, opr.SOQLQuery, extractFileName);
+	processConfFile+= extractJobBean;
 
 	// Create the bean for create job
-	String mappingFileForCreate = objToCreateMappingFile.get(objAPIName);
+	String mappingFileForCreate = opr.mappingFileForCreate;
 	String createJobName = createJobPrefix+objAPIName;
-	processConfFile+= '\n\t<bean id="'+createJobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
-	processConfFile+= '\n\t\t<property name="name" value="'+createJobName+'"/>';
-	processConfFile+= '\n\t\t<property name="configOverrideMap">';
-	processConfFile+= '\n\t\t\t<map>';
-	processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="upsert"/>';
-	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvRead"/>';
-	processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
-	processConfFile+= '\n\t\t\t\t<entry key="sfdc.externalIdField" value="'+sandboxIdField+'"/>';
-	processConfFile+= '\n\t\t\t\t<entry key="process.mappingFile" value="'+rootFolderForAllFiles+createJobName+'.sdl"/>';
-	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+rootFolderForAllFiles+extractJobName+'.csv"/>';
-	processConfFile+= '\n\t\t\t</map>';
-	processConfFile+= '\n\t\t</property>';
-	processConfFile+= '\n\t</bean>';
-
+	String createJobMappingFileName = rootFolderForAllFiles+createJobName+'.sdl';
+	String createJobBean = prepareUpsertBean(createJobName, objAPIName, sandboxIdField, createJobMappingFileName, extractFileName);
+	processConfFile+= createJobBean;
+	
 	// Create the bean for update job
-	String mappingFileForUpdate = objToUpdateMappingFile.get(objAPIName);
+	String mappingFileForUpdate = opr.mappingFileForUpdate;
 	if(!String.isEmpty(mappingFileForUpdate)){
 		String updateJobName = createJobPrefix+objAPIName;
-		processConfFile+= '\n\t<bean id="'+updateJobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
-		processConfFile+= '\n\t\t<property name="name" value="'+updateJobName+'"/>';
-		processConfFile+= '\n\t\t<property name="configOverrideMap">';
-		processConfFile+= '\n\t\t\t<map>';
-		processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="upsert"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvRead"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="sfdc.externalIdField" value="'+sandboxIdField+'"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="process.mappingFile" value="'+rootFolderForAllFiles+updateJobName+'.sdl"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+rootFolderForAllFiles+extractJobName+'.csv"/>';
-		processConfFile+= '\n\t\t\t</map>';
-		processConfFile+= '\n\t\t</property>';
-		processConfFile+= '\n\t</bean>';
+		String updateJobMappingFileName = rootFolderForAllFiles+updateJobName+'.sdl';
+		String updateJobBean = prepareUpsertBean(createJobName, objAPIName, sandboxIdField, updateJobMappingFileName, extractFileName);
+		processConfFile+= updateJobBean;
 	}
 }
 processConfFile+= '\n</beans>';
 
-	Document d = new Document();
-	d.Name = 'Process conf file';
-	d.Body = Blob.valueOf(processConfFile);
-	d.ContentType = 'text/plain';
-	d.Type = 'txt';
-	d.FolderId = '0055K000000IYUF';
-	insert d;
-	system.debug(d.Name+ ' with id '+d.Id);
+Document d = new Document();
+d.Name = 'Process conf file';
+d.Body = Blob.valueOf(processConfFile);
+d.ContentType = 'text/plain';
+d.Type = 'txt';
+d.FolderId = '0055K000000IYUF';
+insert d;
+system.debug(d.Name+ ' with id '+d.Id);
 	
 /*
 	d = new Document();
