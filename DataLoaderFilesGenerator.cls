@@ -3,6 +3,7 @@ public class DataLoaderFilesGenerator {
     public static String extractJobSuffix = '_Extract';
 	public static String insertJobSuffix = '_Insert';
 	public static String updateJobSuffix = '_Update';
+	public static String sandboxIdField = 'Record_Id_from_production__c';
 
     class ObjectProcessResults{
         String SOQLQuery;
@@ -27,24 +28,47 @@ public class DataLoaderFilesGenerator {
 		}
     }
     
-	public static String generateBeansForDataSet(String objAPIName, ObjectProcessResults opr, list<ContentVersion> filesList){
-		return null;
+	public static String generateBeansForDataSet(Integer dataSetNumber, DataSet ds, ObjectProcessResults opr, list<String> dataLoaderJobNames, list<String> updateJobNames){
+		String beansForDatSet = '';
+
+		// Create the bean for extract job
+		String extractJobName = String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+extractJobSuffix;
+		dataLoaderJobNames.add(extractJobName);
+		String extractFileName = rootFolderForAllFiles+extractJobName+'.csv';
+		String SOQLQueryWithFilters = opr.SOQLQuery + (ds.filterString == null ? '' : (' WHERE '+ds.filterString));
+		String extractJobBean = prepareExtractBean(extractJobName, ds.objAPIName, SOQLQueryWithFilters, extractFileName);
+		beansForDatSet+= extractJobBean;
+
+		// Create the bean for create job
+		String insertJobName = String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+insertJobSuffix;
+		dataLoaderJobNames.add(insertJobName);
+		String insertJobBean = prepareUpsertBean(insertJobName, ds.objAPIName, sandboxIdField, opr.mappingFileForInsert, extractFileName);
+		beansForDatSet+= insertJobBean;
+
+		// Create the bean for update job
+		if(!String.isEmpty(opr.mappingFileForUpdate)){
+			String updateJobName = String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+updateJobSuffix;
+			updateJobNames.add(updateJobName);
+			String updateJobBean = prepareUpsertBean(updateJobName, ds.objAPIName, sandboxIdField, opr.mappingFileForUpdate, extractFileName);
+			beansForDatSet+= updateJobBean;
+		}
+		return beansForDatSet;	
 	}
     
     public static String openBean(String jobName){
-        String processConfFile = '';
-        processConfFile+= '\n\t<bean id="'+jobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
-        processConfFile+= '\n\t\t<property name="name" value="'+jobName+'"/>';
-        processConfFile+= '\n\t\t<property name="configOverrideMap">';
-        processConfFile+= '\n\t\t\t<map>';
-        return processConfFile;
+        String beanTag = '';
+        beanTag+= '\n\t<bean id="'+jobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
+        beanTag+= '\n\t\t<property name="name" value="'+jobName+'"/>';
+        beanTag+= '\n\t\t<property name="configOverrideMap">';
+        beanTag+= '\n\t\t\t<map>';
+        return beanTag;
     }
     
-    public static String closeBean(String processConfFile){
-        processConfFile+= '\n\t\t\t</map>';
-        processConfFile+= '\n\t\t</property>';
-        processConfFile+= '\n\t</bean>';
-        return processConfFile;
+    public static String closeBean(String beanTag){
+        beanTag+= '\n\t\t\t</map>';
+        beanTag+= '\n\t\t</property>';
+        beanTag+= '\n\t</bean>';
+        return beanTag;
     }
     
     public static String prepareExtractBean(String jobName, String objAPIName, String SOQLQuery, String FileName){
@@ -98,6 +122,8 @@ public class DataLoaderFilesGenerator {
 		datasets.add(new DataSet('Incentive__c'));
 		datasets.add(new DataSet('Opportunity'));
 		datasets.add(new DataSet('Lead', 'IsConverted = false'));
+		
+		processDataSets(datasets);
 	}
 	
     public static void processDataSets(list<DataSet> datasets){
@@ -111,7 +137,6 @@ public class DataLoaderFilesGenerator {
         for(DataSet ds : datasets){
 			objectsToLoad.add(ds.objAPIName);
 		}
-        String sandboxIdField = 'Record_Id_from_production__c';
 
         // Variables to hold the process results
         map<String, ObjectProcessResults> objProcessResultsMap = new map<String, ObjectProcessResults>();
@@ -119,7 +144,7 @@ public class DataLoaderFilesGenerator {
         list<ContentVersion> filesList = new list<ContentVersion>();
         // Begin processing
 		Integer dataSetNumber = 1;
-		list<String> jobNames = new list<String>();
+		list<String> dataLoaderJobNames = new list<String>();
 		list<String> updateJobNames = new list<String>();
 		for(DataSet ds : datasets){
 			String objAPIName =  ds.objAPIName;
@@ -214,31 +239,11 @@ public class DataLoaderFilesGenerator {
 					setUpObjects.add('Group');
 			}
 
-			// Create the bean for extract job
-            String extractJobName = String.ValueOf(dataSetNumber)+'_'+objAPIName+extractJobSuffix;
-			jobNames.add(extractJobName);
-            String extractFileName = rootFolderForAllFiles+extractJobName+'.csv';
-			String SOQLQueryWithFilters = opr.SOQLQuery + (ds.filterString == null ? '' : (' WHERE '+ds.filterString));
-            String extractJobBean = prepareExtractBean(extractJobName, objAPIName, SOQLQueryWithFilters, extractFileName);
-            processConfFile+= extractJobBean;
-
-            // Create the bean for create job
-            String insertJobName = String.ValueOf(dataSetNumber)+'_'+objAPIName+insertJobSuffix;
-			jobNames.add(insertJobName);
-            String insertJobBean = prepareUpsertBean(insertJobName, objAPIName, sandboxIdField, opr.mappingFileForInsert, extractFileName);
-            processConfFile+= insertJobBean;
-
-            // Create the bean for update job
-            String mappingFileForUpdate = opr.mappingFileForUpdate;
-            if(!String.isEmpty(mappingFileForUpdate)){
-				String updateJobName = String.ValueOf(dataSetNumber)+'_'+objAPIName+updateJobSuffix;
-				updateJobNames.add(updateJobName);
-                String updateJobBean = prepareUpsertBean(updateJobName, objAPIName, sandboxIdField, opr.mappingFileForUpdate, extractFileName);
-                processConfFile+= updateJobBean;
-            }
+			processConfFile+= generateBeansForDataSet(dataSetNumber, ds, opr, dataLoaderJobNames, updateJobNames);
+			dataSetNumber++;
         }
 		// Add all the update jobs after the extract and inserts are done
-		jobNames.addAll(updateJobNames);
+		dataLoaderJobNames.addAll(updateJobNames);
         processConfFile+= '\n</beans>';
 		filesList.add(prepFile(processConfFile, 'process-conf.xml'));
 
