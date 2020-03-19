@@ -1,5 +1,5 @@
 public class DataLoaderFilesGenerator {
-	public static String rootFolderForAllFiles = 'c:\\Users\\jerun\\dataloader\\v48.0.0\\downloaded-content\\';
+	public static String rootFolderForAllFiles = 'C:\\Users\\jerun\\dataloader\\v48.0.0\\downloaded-content\\';
     public static String extractJobSuffix = '_Extract';
 	public static String insertJobSuffix = '_Insert';
 	public static String updateJobSuffix = '_Update';
@@ -32,7 +32,7 @@ public class DataLoaderFilesGenerator {
 		String beansForDatSet = '';
 
 		// Create the bean for extract job
-		String extractJobName = String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+extractJobSuffix;
+		String extractJobName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+extractJobSuffix;
 		dataLoaderJobNames.add(extractJobName);
 		String extractFileName = extractJobName+'.csv';
 		String SOQLQueryWithFilters = opr.SOQLQuery + (ds.filterString == null ? '' : (' WHERE '+ds.filterString));
@@ -40,14 +40,14 @@ public class DataLoaderFilesGenerator {
 		beansForDatSet+= extractJobBean;
 
 		// Create the bean for create job
-		String insertJobName = String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+insertJobSuffix;
+		String insertJobName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+insertJobSuffix;
 		dataLoaderJobNames.add(insertJobName);
 		String insertJobBean = prepareUpsertBean(insertJobName, ds.objAPIName, sandboxIdField, opr.mappingFileForInsert, extractFileName);
 		beansForDatSet+= insertJobBean;
 
 		// Create the bean for update job
 		if(!String.isEmpty(opr.mappingFileForUpdate)){
-			String updateJobName = String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+updateJobSuffix;
+			String updateJobName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+updateJobSuffix;
 			updateJobNames.add(updateJobName);
 			String updateJobBean = prepareUpsertBean(updateJobName, ds.objAPIName, sandboxIdField, opr.mappingFileForUpdate, extractFileName);
 			beansForDatSet+= updateJobBean;
