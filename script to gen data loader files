@@ -5,11 +5,11 @@ set<String> setUpObjects = new set<String>();
 setUpObjects.add('RecordType');
 
 set<String> objectsToLoad = new set<String>();
-objectsToLoad.add('Client_Endorsement__c');
 set<String> objectsProcessed = new set<String>();
 objectsToLoad.add('Account');
 objectsToLoad.add('Contact');
 objectsToLoad.add('User');
+objectsToLoad.add('Client_Endorsement__c');
 //objectsToLoad.removeAll(objectsLoaded);
 String sandboxIdField = 'Sandbox_Migration_Id__c';
 
@@ -91,7 +91,9 @@ for(String objAPIName : objectsToLoad){
 	objToUpdateMappingFile.put(objAPIName, mappingFileForUpdate);
 	objectsProcessed.add(objAPIName);
 	
-	break;
+	// When user records have been processed, it is safe to perform polymorphic lookups for user and queue objects
+	if(objAPIName == 'User')
+		setUpObjects.add('Group');
 }
 // Mapping files ready
 // Queries ready
@@ -109,50 +111,57 @@ for(String objAPIName : objectsToLoad){
 	// Create the bean for extract job
 	String SOQLQuery = objToQueryString.get(objAPIName);
 	String extractJobName = extractJobPrefix+objAPIName;
-	processConfFile+= '\n<bean id="'+extractJobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
-	processConfFile+= '\n<property name="name" value="'+extractJobName+'"/>';
-	processConfFile+= '\n<property name="configOverrideMap">';
-	processConfFile+= '\n<map>';
-	processConfFile+= '\n<entry key="process.operation" value="extract"/>';
-	processConfFile+= '\n<entry key="dataAccess.type" value="csvWrite"/>';
-	processConfFile+= '\n<entry key="sfdc.entity" value="'+objAPIName+'"/>';
-	processConfFile+= '\n<entry key="sfdc.extractionSOQL" value="'+SOQLQuery+'"/>';
-	processConfFile+= '\n<entry key="dataAccess.name" value="'+rootFolderForAllFiles+extractJobName+'.csv"/>';
-	processConfFile+= '\n</map>';
+	processConfFile+= '\n\t<bean id="'+extractJobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
+	processConfFile+= '\n\t\t<property name="name" value="'+extractJobName+'"/>';
+	processConfFile+= '\n\t\t<property name="configOverrideMap">';
+	processConfFile+= '\n\t\t\t<map>';
+	processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="extract"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvWrite"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="sfdc.extractionSOQL" value="'+SOQLQuery+'"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+rootFolderForAllFiles+extractJobName+'.csv"/>';
+	processConfFile+= '\n\t\t\t</map>';
+	processConfFile+= '\n\t\t</property>';
+	processConfFile+= '\n\t</bean>';
+    
 
 	// Create the bean for create job
 	String mappingFileForCreate = objToCreateMappingFile.get(objAPIName);
 	String createJobName = createJobPrefix+objAPIName;
-	processConfFile+= '\n<bean id="'+createJobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
-	processConfFile+= '\n<property name="name" value="'+createJobName+'"/>';
-	processConfFile+= '\n<property name="configOverrideMap">';
-	processConfFile+= '\n<map>';
-	processConfFile+= '\n<entry key="process.operation" value="upsert"/>';
-	processConfFile+= '\n<entry key="dataAccess.type" value="csvRead"/>';
-	processConfFile+= '\n<entry key="sfdc.entity" value="'+objAPIName+'"/>';
-	processConfFile+= '\n<entry key="sfdc.externalIdField" value="'+sandboxIdField+'"/>';
-	processConfFile+= '\n<entry key="process.mappingFile" value="'+rootFolderForAllFiles+createJobName+'.sdl"/>';
-	processConfFile+= '\n<entry key="dataAccess.name" value="'+rootFolderForAllFiles+extractJobName+'.csv"/>';
-	processConfFile+= '\n</map>';
+	processConfFile+= '\n\t<bean id="'+createJobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
+	processConfFile+= '\n\t\t<property name="name" value="'+createJobName+'"/>';
+	processConfFile+= '\n\t\t<property name="configOverrideMap">';
+	processConfFile+= '\n\t\t\t<map>';
+	processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="upsert"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvRead"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="sfdc.externalIdField" value="'+sandboxIdField+'"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="process.mappingFile" value="'+rootFolderForAllFiles+createJobName+'.sdl"/>';
+	processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+rootFolderForAllFiles+extractJobName+'.csv"/>';
+	processConfFile+= '\n\t\t\t</map>';
+	processConfFile+= '\n\t\t</property>';
+	processConfFile+= '\n\t</bean>';
 
 	// Create the bean for update job
 	String mappingFileForUpdate = objToUpdateMappingFile.get(objAPIName);
 	if(!String.isEmpty(mappingFileForUpdate)){
 		String updateJobName = createJobPrefix+objAPIName;
-		processConfFile+= '\n<bean id="'+updateJobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
-		processConfFile+= '\n<property name="name" value="'+updateJobName+'"/>';
-		processConfFile+= '\n<property name="configOverrideMap">';
-		processConfFile+= '\n<map>';
-		processConfFile+= '\n<entry key="process.operation" value="upsert"/>';
-		processConfFile+= '\n<entry key="dataAccess.type" value="csvRead"/>';
-		processConfFile+= '\n<entry key="sfdc.entity" value="'+objAPIName+'"/>';
-		processConfFile+= '\n<entry key="sfdc.externalIdField" value="'+sandboxIdField+'"/>';
-		processConfFile+= '\n<entry key="process.mappingFile" value="'+rootFolderForAllFiles+updateJobName+'.sdl"/>';
-		processConfFile+= '\n<entry key="dataAccess.name" value="'+rootFolderForAllFiles+extractJobName+'.csv"/>';
-		processConfFile+= '\n</map>';
+		processConfFile+= '\n\t<bean id="'+updateJobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
+		processConfFile+= '\n\t\t<property name="name" value="'+updateJobName+'"/>';
+		processConfFile+= '\n\t\t<property name="configOverrideMap">';
+		processConfFile+= '\n\t\t\t<map>';
+		processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="upsert"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvRead"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="sfdc.externalIdField" value="'+sandboxIdField+'"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="process.mappingFile" value="'+rootFolderForAllFiles+updateJobName+'.sdl"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+rootFolderForAllFiles+extractJobName+'.csv"/>';
+		processConfFile+= '\n\t\t\t</map>';
+		processConfFile+= '\n\t\t</property>';
+		processConfFile+= '\n\t</bean>';
 	}
 }
-processConfFile+= '</beans>';
+processConfFile+= '\n</beans>';
 
 	Document d = new Document();
 	d.Name = 'Process conf file';
