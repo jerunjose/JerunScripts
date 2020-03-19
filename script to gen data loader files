@@ -4,10 +4,6 @@ class objectProcessResults{
 	String mappingFileForUpdate;
 }
 
-private void showSomething(something st){
-    system.debug(st.textHere);
-}
-
 String openBean(String jobName){
 	String processConfFile = '';
 	processConfFile+= '\n\t<bean id="'+jobName+'" class="com.salesforce.dataloader.process.ProcessRunner" singleton="false">';
