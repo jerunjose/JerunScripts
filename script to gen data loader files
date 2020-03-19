@@ -153,6 +153,7 @@ String rootFolderForAllFiles = 'c:\\dataloader\\samples\\data\\';
 String extractJobPrefix = 'Extract_';
 String createJobPrefix = 'Create_';
 String updateJobPrefix = 'Update_';
+list<ContentVersion> filesList = new list<ContentVersion>();
 for(String objAPIName : objectsToLoad){
 	objectProcessResults opr = objProcessResultsMap.get(objAPIName);
 	// Create the bean for extract job
@@ -167,7 +168,14 @@ for(String objAPIName : objectsToLoad){
 	String createJobMappingFileName = rootFolderForAllFiles+createJobName+'.sdl';
 	String createJobBean = prepareUpsertBean(createJobName, objAPIName, sandboxIdField, createJobMappingFileName, extractFileName);
 	processConfFile+= createJobBean;
-	
+
+	ContentVersion createMappingFile = new ContentVersion();
+	createMappingFile.ContentLocation = 'S';
+	createMappingFile.VersionData = EncodingUtil.base64Decode(mappingFileForCreate);
+	createMappingFile.Title = createJobMappingFileName;
+	createMappingFile.PathOnClient = createJobMappingFileName;
+	filesList.add(createMappingFile);
+
 	// Create the bean for update job
 	String mappingFileForUpdate = opr.mappingFileForUpdate;
 	if(!String.isEmpty(mappingFileForUpdate)){
@@ -175,19 +183,42 @@ for(String objAPIName : objectsToLoad){
 		String updateJobMappingFileName = rootFolderForAllFiles+updateJobName+'.sdl';
 		String updateJobBean = prepareUpsertBean(createJobName, objAPIName, sandboxIdField, updateJobMappingFileName, extractFileName);
 		processConfFile+= updateJobBean;
+
+		ContentVersion updateMappingFile = new ContentVersion();
+		updateMappingFile.ContentLocation = 'S';
+		updateMappingFile.VersionData = EncodingUtil.base64Decode(mappingFileForUpdate);
+		updateMappingFile.Title = updateJobMappingFileName;
+		updateMappingFile.PathOnClient = updateJobMappingFileName;
+		filesList.add(updateMappingFile);
 	}
 }
 processConfFile+= '\n</beans>';
 
-Document d = new Document();
-d.Name = 'Process conf file';
-d.Body = Blob.valueOf(processConfFile);
-d.ContentType = 'text/plain';
-d.Type = 'txt';
-d.FolderId = '0055K000000IYUF';
-insert d;
-system.debug(d.Name+ ' with id '+d.Id);
-	
+ContentWorkspace cw = [select id, RootContentFolderId from ContentWorkspace WHERE Name = 'Data Loader Config Files'];
+list<ContentDocument> filesToDelete = new list<ContentDocument>();
+for(ContentDocumentLink cdl : [SELECT ContentDocumentId FROM ContentDocumentLink WHERE LinkedEntityId = :cw.Id]){
+	ContentDocument cd = new ContentDocument(id = cdl.ContentDocumentId);
+	filesToDelete.add(cd);
+}
+if(!filesToDelete.isEmpty()){
+	delete filesToDelete;
+}
+insert filesList;
+list<ContentDocumentLink> cdlList = new list<ContentDocumentLink>();
+for(ContentVersion cv : [SELECT ContentDocumentId FROM ContentVersion Where Id IN :filesList]){
+	ContentDocumentLink cdl = new ContentDocumentLink();
+	cdl.ContentDocumentId = cv.ContentDocumentId;
+	cdl.ShareType = 'I';
+	cdl.Visibility = 'AllUsers';
+	cdl.LinkedEntityId = cw.Id;
+	cdlList.add(cdl);
+}
+insert cdlList;
+
+String URLToDownloadFrom = 'https://ironfish--tsaishen.my.salesforce.com/sfc/#search?searchWorkspaceIds=%5B%22'+cw.Id+'%22%5D';
+
+
+
 /*
 	d = new Document();
 	d.Name = 'Mapping file for update for '+objAPIName;
