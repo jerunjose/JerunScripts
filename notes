@@ -1,0 +1,513 @@
+
+--------------- Script to find case team member where region is different -------------
+list<CCMS_Case_Team_Member__c> ctmList = [SELECT Id, Case__c, Region__c, Regional_Officer__c, Regional_Officer__r.User__c, User__c FROM CCMS_Case_Team_Member__c where Regional_Officer__c != null];
+for(CCMS_Case_Team_Member__c ctm : ctmList){
+    if(ctm.User__C != ctm.Regional_Officer__r.User__c)
+        system.debug(ctm);
+}
+--------------- --------------- 
+
+--------------- Script to check if user is assigned -------------
+ID fromUserId = '0057F000001hcHs';
+for(CCMS_Activity__c act :[select Id, Name, Assigned_To__c, Approval_Raised_By__c, Allocate_To__c, Allocate_To__r.User__c, Case__r.Name
+                           from CCMS_Activity__c
+                           where Case__r.IsClosed__c = false and
+                           (Assigned_To__c = :fromUserId
+                            or Approval_Raised_By__c = :fromUserId
+                            or Allocate_To__r.User__c = :fromUserId)]){
+                                system.debug('activity '+act.Name+' with ID '+act.ID+' for case '+act.Case__r.Name);
+                            }
+
+for(CCMS_Outcome__c otc :[select Id, Name, Assigned_To__c, Approval_Raised_By__c, Case__r.Name
+                          from CCMS_Outcome__c
+                          where Case__r.IsClosed__c = false and
+                          (Assigned_To__c = :fromUserId
+                           or Approval_Raised_By__c = :fromUserId)]){
+                               system.debug('outcome '+otc.Name+' with ID '+otc.ID+' for case '+otc.Case__r.Name);
+                           }
+
+for(CCMS_Case_Team_Member__c ctm : [Select Id, User__c, Case__r.Name, Role__c, Region__c, Regional_Officer__c
+                                    from CCMS_Case_Team_Member__c
+                                    where Case__r.IsClosed__c = false
+                                    and User__c = :fromUserId]){
+                                        system.debug('team member '+ctm.ID+' with role '+ctm.Role__c+' for case '+ctm.Case__r.Name);
+                                    }
+for(CCMS_Case__c cs : [select Id, Name, Assigned_To__c, Approval_Raised_By__c, OwnerId, Lead_Compliance_Officer__c, Assigned_Region__c 
+                       from CCMS_Case__c
+                       where IsClosed__c = false and
+                       (Assigned_To__c = :fromUserId
+                        or Approval_Raised_By__c = :fromUserId
+                        or OwnerId = :fromUserId
+                        or Lead_Compliance_Officer__c = :fromUserId)]){
+                            system.debug('case ID '+cs.ID+' with case number '+cs.Name);
+                        }
+for(CCMS_Regional_Officer__c rgo : [select Id, Region__c, Region__r.Name, Role__C
+                                    from CCMS_Regional_Officer__c
+                                    where User__c = :fromUserId]){
+                                        system.debug('regional officer with ID '+rgo.ID+' for region '+rgo.Region__r.Name+' with Role '+rgo.Role__c);
+                                    }
+--------------- --------------- 
+
+--------------- Script to remove duplicate users in case team members -------------
+String role = 'Case Creator';
+// String role = 'Assistant Compliance Officer';
+// String role = 'Lead Compliance Officer';
+map<String, ID> keyMap = new map<String, ID>();
+list<CCMS_Case_Team_Member__c> ctmList = [select id, case__c, user__r.Name, Region__c, user__c, role__C from CCMS_Case_Team_Member__c where role__c = :role];
+list<CCMS_Case_Team_Member__c> delList = new list<CCMS_Case_Team_Member__c>();
+for(CCMS_Case_Team_Member__c ctm : ctmList){
+    String key = String.ValueOf(ctm.Case__c)+String.ValueOf(ctm.User__c);
+    if(!keyMap.containsKey(key)){
+        keyMap.put(key, ctm.ID);
+    }else{
+		// is a duplicate
+		delList.add(ctm);
+    }
+}
+system.debug(delList.size());
+list<CCMS_Activity__c> activitiesToDelete = [select id, Allocate_To__c, Case__c from CCMS_Activity__c where Allocate_To__c = :delList];
+system.debug(activitiesToDelete.size());
+list<CCMS_Linked_Attachment__c> llaToDelete = [select id from CCMS_Linked_Attachment__c where Activity__c = :activitiesToDelete];
+system.debug(llaToDelete.size());
+if(false){
+	delete llaToDelete;
+	delete activitiesToDelete;
+	delete delList;
+}
+--------------- --------------- 
+
+--------------- formula to generate logic flags xml -------------
+=CONCATENATE("<fields>","<fullName>",[@[ns1:fullName]],"</fullName>","<defaultValue>",[@[ns1:defaultValue]],"</defaultValue>","<description>",[@[ns1:description2]],"</description>","<inlineHelpText>",[@[ns1:description2]],"</inlineHelpText>","<label>",[@[ns1:label]],"</label>","<type>",[@[ns1:type]],"</type>","</fields>")
+--------------- --------------- 
+
+--------------- Script to cleanup database -------------
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Running_Log__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Linked_Attachment__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Vehicle_Information__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Attachment__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Linked_Land_Parcel__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Prioritization_Assessment__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Suburb__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Outcome__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Activity__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Case_Team_Member__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Case_Entity__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Related_Entity__c WHERE External_data_source__c != null')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Contact_Information__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Spatial_Information__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Legislation__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Case__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Person__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Company__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Regional_Officer__c')); 
+Database.executeBatch(new CCMS_Temp_DeleteRecords('SELECT Id from CCMS_Region__c')); 
+---------------------------
+
+--------------- script to identify non CCMS users -------------
+PermissionSet ps = [select id FROM PermissionSet Where Name = 'CCMSReadOnly'];
+set<ID> userIDs = new set<ID>();
+for(PermissionSetAssignment psa :  [select assigneeID from PermissionSetAssignment where permissionsetID = :ps.id]){
+    userIDs.add(psa.assigneeID);
+}
+list<User> usList = [select id, email, business_unit__c from user where id in :userIDs and isactive = true and profile.userlicense.name = 'Salesforce Platform' and (not business_unit__c like 'CCMS%')];
+for(User cs : usList){
+	system.debug(cs.email);
+	system.debug(cs.business_unit__c);
+}
+---------------------------
+
+--------------- script to cases with suburb not matching reference -------------
+set<String> suburbs = new set<String>();
+for(ccms_suburb__c s : [select Suburb_Postcode__c from ccms_suburb__c where isactive__c = true]){
+    suburbs.add(s.Suburb_Postcode__c);
+}
+system.debug([select id, name, Suburb_and_Postcode__c from ccms_case__c where NOT (Suburb_and_Postcode__c in :suburbs)]);
+---------------------------
+
+--------------- Batch file script to remove console.log -------------
+for %%x in (
+"C:\Users\Jerun\Documents\Bitbucket Repos\CCMS\CCMSDev\src\aura\CCMS_Activity_Approval_Actions\CCMS_Activity_Approval_ActionsHelper.js"
+"C:\Users\Jerun\Documents\Bitbucket Repos\CCMS\CCMSDev\src\aura\CCMS_AddAddress\CCMS_AddAddressController.js"
+) do (
+	type %%x | findstr /v console.log > tempFile.txt
+	del %%x
+	copy tempFile.txt %%x
+)
+---------------------------
+
+--------------- script to reset password for test users -------------
+PermissionSet ps = [select id FROM PermissionSet Where Name = 'CCMSReadOnly'];
+set<ID> userIDs = new set<ID>();
+for(PermissionSetAssignment psa :  [select assigneeID from PermissionSetAssignment where permissionsetID = :ps.id]){
+    userIDs.add(psa.assigneeID);
+}
+list<User> usList = [select id from user where id in :userIDs and isactive = true and profile.userlicense.name = 'Salesforce Platform'];
+for(User cs : usList){
+    system.setPassword(cs.ID, 'ToBeReset@2018');
+}
+---------------------------
+
+--------------- steps to replace ciit user reg object name -------------
+remove app builder page as app default and delete it
+delete trigger CCMS_CIIT_UserRegister
+delete object
+---------------------------
+
+--------------- script to update case suburb -------------
+Navigate to Suburb tab and search for the suburb record matching the old name to use
+	Deactivate the old suburb record
+	Add a suburb alias record for the new suburb details
+Create a new suburb record (active)
+	Add a suburb alias for the old suburb details
+
+// --- START OF INPUT ZONE --- 
+// Input/Modify the values here for the change required
+String oldSuburbName = 'Moree';
+String oldSuburbPostcode = '2400';
+String NewSuburbName = 'MoreeNew';
+String NewSuburbPostcode = '2402';
+// --- END OF INPUT ZONE --- 
+
+// Query cases matching suburb and postcode 
+// Filter for open cases only
+list<ccms_case__c> caseLst = [select id from ccms_case__c where isclosed__c  = false and Suburb__c = :oldSuburbName AND Postcode__c = :oldSuburbPostcode];
+if(!caseLst.isEmpty()){
+    for(ccms_case__c cs : caseLst){
+        cs.Suburb__c = NewSuburbName;
+        cs.Postcode__c = NewSuburbPostcode;
+    }
+    
+    CCMS_Utility.ccmsFunctionsToDisable.Case_ApprovalRelatedEdits__c = true;
+    CCMS_Utility.ccmsFunctionsToDisable.Case_blockRelatedListEditOnClosedCase__c = true;
+    CCMS_Utility.ccmsFunctionsToDisable.Case_setLastUpdatedBy__c = true;
+    
+    update caseLst;
+}
+
+---------------------------
+
+
+--------------- script to update user role -------------
+list<CCMS_Regional_Officer__c> roList = [select user__c from CCMS_Regional_Officer__c];
+set<ID> userIDs = new set<ID>();
+for(CCMS_Regional_Officer__c ro : roList){
+    userIDs.add(ro.User__c);
+}
+userrole ur = [select id from userrole where developername = 'CCMS_Users'];
+PermissionSet ps = [select id FROM PermissionSet Where Name = 'CCMSReadOnly'];
+PermissionSet ps2 = [select id FROM PermissionSet Where Name = 'CCMSCaseCreatorObjPermissions'];
+PermissionSet ps3 = [select id FROM PermissionSet Where Name = 'CCMSComplianceOfficerObjPermissions'];
+PermissionSet ps4 = [select id FROM PermissionSet Where Name = 'CCMSCIITCommunityAccess'];
+list<User> usList = [select id from user where id in :userIDs];
+list<PermissionSetAssignment> psaList = new list<PermissionSetAssignment>();
+for(User cs : usList){
+    PermissionSetAssignment psa = new PermissionSetAssignment();
+    psa.AssigneeID = cs.ID;
+    psa.PermissionSetID = ps.id;
+    psaList.add(psa);
+
+    PermissionSetAssignment psa2 = new PermissionSetAssignment();
+    psa2.AssigneeID = cs.ID;
+    psa2.PermissionSetID = ps2.ID;
+    psaList.add(psa2);
+
+    PermissionSetAssignment psa3 = new PermissionSetAssignment();
+    psa3.AssigneeID = cs.ID;
+    psa3.PermissionSetID = ps3.ID;
+    psaList.add(psa3);
+    
+    PermissionSetAssignment psa4 = new PermissionSetAssignment();
+    psa4.AssigneeID = cs.ID;
+    psa4.PermissionSetID = ps4.ID;
+    psaList.add(psa4);
+
+	cs.UserRoleID = ur.ID;
+    cs.IsActive = true;
+    
+    system.setPassword(cs.ID, 'ToBeReset@2018');
+}
+//update usList;
+//insert psaList;
+---------------------------
+
+CIIT UAT land parcel for enquiry:  3//408335 and 1//408335 
+
+CIIT System Test
+LotNumber         PlanNumber      SectionNumber
+7028                       1052695                                NULL
+1                              126042                                  NULL
+104                         880524                                  NULL
+10                           1145118                                NULL
+15           752419                                  NULL
+1              101823  
+1262       754611  
+1              101823  
+1262       754611  
+11           751423                                  NULL
+113         755724                                  NULL
+124         755724                                  NULL
+136         755724                                  NULL
+138         755724                                  NULL
+1              1054943                
+1              1054943                
+2              231108                                  NULL
+20           1063060                                NULL
+2              854268                                  NULL
+14           2500                       1
+15           2500                       1
+16           2500                       1
+17           2500                       1
+18           2500                       1
+
+Title search CCMSTest - 7//900437
+---------------------------------
+
+username: integration.user@oeh2.com.ccmsdmtest
+password : Salesforce@123
+security token : TwBlgfqndlY5s3SnEu6MNGCb
+Client Id : 3MVG9Se4BnchkASmoRSTQnhXJT7bf6mjw_tjxHdxhPz3wUrgFScwNVauwiZfn4dwGaSHC6W9.WUEkVkYhf6ip
+Client Secret : 7507798315510057248 
+
+Username: integration.user@oeh2.com.ccmsdryrun
+Password: CCMS@2018
+Security Token: 4shXfQwnXZl1lt0niQLak89o0
+Consumer Key: 3MVG9Se4BnchkASnXkfrbqZV_CC4uigOrbfwEyM6c89ymZtqhI07Hbv1dRYWrb8R_WfDkgfBKy46PNPVn0dss
+Consumer Secret:  8651323048846349986 
+ 
+username: integration.user@environment.nsw.gov.au.oeh2.ccmstest
+password: CCMS@2018
+sec token: Xll3WyadoZuY2fBKnP3ymDfE9
+client id: 3MVG959Nd8JMmavSgI476BYxZ6XdXDlVd5DdeichZi7WJv2Q8Qb.ZtOMmiQ5T1DJmSqV0p_duRvEfRvDqlbJQ
+client secret: 6133624588646031491
+
+Username: integration.user@environment.nsw.gov.au.oeh2.ccmsdata
+Password: CCMS@2018
+Security Token: tKY3jm6271JW111ywCncKJyQ
+Client ID: 3MVG959Nd8JMmavQBArgfStC46f1zNlt6N3BKodYjlDRlwOxLem0OGmZVLid3lkQ_4WXPN_f.n_MRvgfkNTfT
+Client Secret: 8117939110220179862
+
+Username: integration.user@environment.nsw.gov.au.oeh2.uat
+Password: Salesforce$112018
+Security Token: FNZDtQrQopoygTOSb6am5obz
+Client ID: 3MVG910YPh8zrcR2rYoqqARUicyxo1x6LX.JcsGv4epCh.bijekyhmz_rUbIBq1In3mMnK1BV.inJ3a0xNwq3
+Client Secret: 8811182172447769809
+
+Username: integration.user@oeh2.com.ccmsdmsit2
+Password: CCMS@2018
+Security Token: ZBmHVjTx53dknihr1bpN8QuEu
+Consumer Key: 3MVG99S6MzYiT5k.xkcVRsd1RLfKB8UD9O15PqRWaAfnEcNcjA6IxlJR4xMp.DnOsHFPrGjQ0fEruo1uFbLo_
+Consumer Secret: 9139753368581310130
+
+--------------------------------
+
+list<User> csList = [select id from User where profile.Name like 'ORG Platform%' and IsActive = true];
+PermissionSet ps = [select id FROM PermissionSet Where Name = 'CCMSReadOnly'];
+PermissionSet ps2 = [select id FROM PermissionSet Where Name = 'CCMSCaseCreatorObjPermissions'];
+PermissionSet ps3 = [select id FROM PermissionSet Where Name like 'CCMSBase%'];
+list<PermissionSetAssignment> psaList = new list<PermissionSetAssignment>();
+for(User cs : csList){
+    PermissionSetAssignment psa = new PermissionSetAssignment();
+    psa.AssigneeID = cs.ID;
+    psa.PermissionSetID = ps.id;
+    psaList.add(psa);
+
+    PermissionSetAssignment psa2 = new PermissionSetAssignment();
+    psa2.AssigneeID = cs.ID;
+    psa2.PermissionSetID = ps2.ID;
+    psaList.add(psa2);
+}
+insert psaList;
+
+delete [select id from PermissionSetAssignment where permissionsetID = :ps3.ID];
+
+----------------------------------
+
+public String mapViewerURL{get;set;}
+ID parentID = 'a04O000000WYjkCIAT';
+CCMS_SpatialDataUtility.SpatialDataAdditionalInfo add = new CCMS_SpatialDataUtility.SpatialDataAdditionalInfo();
+add.recordID = parentID;
+this.mapViewerURL = CCMS_SpatialDataUtility.genMapViewerURL(parentID, CCMS_SpatialDataUtility.MapViewerSuburbOperation);
+System.debug('Mapviewerurl' +mapViewerURL ); 
+
+------------------
+
+l0pvh5ys
+
+-----------------------
+CCMS_SpatialDataUtility.AddressRelatedFields add = new CCMS_SpatialDataUtility.AddressRelatedFields();
+add.recordID = UserInfo.getUserId();
+String serialAddInfo = JSON.serialize(add);
+String encryptedserialAddInfo = CCMS_SpatialDataUtility.encryptWithSpatialServiceEncryptionKey(serialAddInfo);
+
+CCMS_SpatialInfoService.requestElem req = new CCMS_SpatialInfoService.requestElem();
+req.AdditionalInfo = encryptedserialAddInfo;
+req.Type = 'testing';
+
+CCMS_SpatialInfoService.respElem resp = CCMS_SpatialInfoService.saveSpatialInfo(req);
+system.debug(resp);
+
+------------------------
+
+---------- fieldglass efforts -----
+
+var timeIn = "09:00 AM";
+var MealOut = "01:00 PM";
+var MealIn = "01:30 PM";
+var timeOut = "05:30 PM";
+var startIndex = 0;
+var endIndex = 5;
+
+for(var index = startIndex; index < endIndex; index++){
+	var timeInelemName = "timein0"+index;
+	var MealOutelemName = "timein1"+index;
+	var MealInelemName = "timein2"+index;
+	var timeOutelemName = "timein3"+index;
+	
+	$("input[name="+timeInelemName+"]").val(timeIn);
+	$("input[name="+MealOutelemName+"]").val(MealOut);
+	$("input[name="+MealInelemName+"]").val(MealIn);
+	var timeOutElem = $("input[name="+timeOutelemName+"]")
+	timeOutElem.val(timeOut);
+	
+	titoCellOnChange(timeOutElem,index);
+}
+
+---------
+
+L0rdH0weI$land
+
+----------------------------------------
+
+oznerd
+WaterN0t
+
+----------------------------------------
+
+Bupa 86079399
+
+----------------------------------------
+
+(function() {
+    var aa = document.querySelectorAll("input[type=checkbox]");
+    for (var i = 0; i < aa.length; i++){
+        aa[i].checked = false;
+    }
+})()
+-----------------------------------
+
+(function() {
+    var aa = document.querySelectorAll("input[type=checkbox], img.checkImg");
+    for (var i = 0; i < aa.length; i++){
+if(i%2 == 0)
+        aa[i].checked = true;
+    }
+})()
+
+------------------ PRINTABLE VIEW AS PDF -------------------
+
+String caseID = '5000l000000mMk8';
+String domainName = 'https://bio2017--masterdev.cs58.my.salesforce.com/';
+String printPageURL = domainName+caseID+'/p';
+PageReference pf = new PageReference(printPageURL);
+Attachment at = new Attachment();
+at.Body = pf.getContent();
+at.ParentID = caseID;
+at.Name = 'Print page.html';
+//insert at;
+
+String responseStr = pf.getContent().toString();
+responseStr = responseStr.replaceAll('src="/', 'src="'+domainName);
+responseStr = responseStr.replaceAll('href="/', 'href="'+domainName);
+Attachment at2 = new Attachment();
+at2.Body = Blob.valueOf(responseStr);
+at2.ParentID = caseID;
+at2.Name = 'Print page cleaned.html';
+insert at2;
+system.debug(at.ID);
+
+------------------------------------------------------
+
+/services/data/v29.0/tooling/query/?q=select id,apexClassorTrigger.Name,numLinescovered, numlinesuncovered from apexcodecoverageAggregate
+
+Lebara
+0404876272
+89610300001623460461
+141088
+051991
+
+G Street - 7GGMEALRA4Q
+
+---------------- Temp delete class -------------
+global class CCMS_Temp_DeleteRecords implements Database.Batchable<sObject>, Database.stateful{
+    global String SelectQuery;
+    global Integer currentIndex;
+    global Boolean isRunAllMode;
+    global static list<String> SOQLArray;
+    
+    static{
+        SOQLArray = new list<String>();
+        SOQLArray.add('SELECT Id from CCMS_Running_Log__c'); //0
+        SOQLArray.add('SELECT Id from CCMS_Linked_Attachment__c'); //1
+        SOQLArray.add('SELECT Id from CCMS_Vehicle_Information__c'); //2
+        SOQLArray.add('SELECT Id from CCMS_Attachment__c'); //3
+        SOQLArray.add('SELECT Id from CCMS_Linked_Land_Parcel__c'); //4
+        SOQLArray.add('SELECT Id from CCMS_Prioritization_Assessment__c'); //5
+        SOQLArray.add('SELECT Id from CCMS_Suburb__c'); //6
+        SOQLArray.add('SELECT Id from CCMS_Suburb_Alias__c'); //7
+        SOQLArray.add('SELECT Id from CCMS_Outcome__c'); //8
+        SOQLArray.add('SELECT Id from CCMS_Activity__c'); //9
+        SOQLArray.add('SELECT Id from CCMS_Case_Team_Member__c'); //10
+        SOQLArray.add('SELECT Id from CCMS_Case_Entity__c'); //11
+        SOQLArray.add('SELECT Id from CCMS_Related_Entity__c WHERE External_data_source__c != null'); //12
+        SOQLArray.add('SELECT Id from CCMS_Contact_Information__c'); //13
+        SOQLArray.add('SELECT Id from CCMS_Spatial_Information__c'); //14
+        SOQLArray.add('SELECT Id from CCMS_Legislation__c'); //15
+        SOQLArray.add('SELECT Id from CCMS_Case__c'); //16
+        SOQLArray.add('SELECT Id from CCMS_Person__c'); //17
+        SOQLArray.add('SELECT Id from CCMS_Company__c'); //18
+        SOQLArray.add('SELECT Id from CCMS_Regional_Officer__c'); //19
+        SOQLArray.add('SELECT Id from CCMS_Region__c'); //20
+    }
+    
+    global CCMS_Temp_DeleteRecords(Integer runIndex){
+        currentIndex = runIndex;
+        SelectQuery = SOQLArray[currentIndex];
+    }
+    
+    global CCMS_Temp_DeleteRecords(String query){
+        SelectQuery = query;
+    }
+    
+    // Start Method
+    global Database.QueryLocator start(Database.BatchableContext BC){
+        string query = SelectQuery;
+        return Database.getQueryLocator(query);
+    }
+    
+    // Execute Logic
+    global void execute(Database.BatchableContext BC, List<SObject>scope){
+        delete scope;
+    }
+    
+    global void finish(Database.BatchableContext BC){
+        if(currentIndex != null){
+            currentIndex++;
+            if(currentIndex <= 20)
+                Database.executeBatch(new CCMS_Temp_DeleteRecords(currentIndex));
+            else{
+                String emailMessage = 'Hi,'
+                    + '<P> This is to notify that all batch jobs have finished running.</p>' ;
+                Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
+                email.setSubject('CCMS - Delete job complete');
+                email.setPlainTextBody(emailMessage);
+                email.setHtmlBody(emailMessage);
+                List<String> toAddressLst = new List<String>();
+                toAddressLst.add(UserInfo.getUserEmail());
+                email.setToAddresses(toAddressLst);
+                CCMS_EmailUtility.setCCMSMailboxIDOnEmail(email);
+                CCMS_EmailUtility.sendEmail(email);
+            }
+        }
+    }
+}
+-----------------------
