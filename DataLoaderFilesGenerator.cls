@@ -1,5 +1,6 @@
 public class DataLoaderFilesGenerator {
 	public static String rootFolderForAllFiles = 'C:\\Users\\jerun\\dataloader\\v48.0.0\\downloaded-content\\';
+	public static String rootFolderForLogFiles = 'C:\\Users\\jerun\\dataloader\\v48.0.0\\logs\\';
     public static String extractJobSuffix = '_Extract';
 	public static String insertJobSuffix = '_Insert';
 	public static String updateJobSuffix = '_Update';
@@ -122,6 +123,8 @@ public class DataLoaderFilesGenerator {
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.externalIdField" value="'+externalIdField+'"/>';
         processConfFile+= '\n\t\t\t\t<entry key="process.mappingFile" value="'+rootFolderForAllFiles+mappingFileName+'"/>';
+        processConfFile+= '\n\t\t\t\t<entry key="process.outputSuccess" value="'+rootFolderForLogFiles+jobName+'_Success.csv"/>';
+        processConfFile+= '\n\t\t\t\t<entry key="process.outputError" value="'+rootFolderForLogFiles+jobName+'_Error.csv"/>';
         processConfFile+= '\n\t\t\t\t<entry key="dataAccess.name" value="'+rootFolderForAllFiles+loadFileName+'"/>';
         processConfFile = closeBean(processConfFile);
         return processConfFile;
@@ -304,7 +307,7 @@ public class DataLoaderFilesGenerator {
 				DataSet partnerAccountsDataSet = new DataSet('Account', 'IsPartner = true');
 				String insertMappingFileNameForPartner = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+partnerAccountsDataSet.objAPIName+insertJobSuffix+'.sdl';
 				String mappingFileData = '#Mapping values from source file (left) and upsert to Salesforce (right)';
-				mappingFileData += '\nIsPartner=nIsPartner';
+				mappingFileData += '\nIsPartner=IsPartner';
 				mappingFileData += '\nId'+'='+sandboxIdField;
 				filesList.add(prepFile(mappingFileData, insertMappingFileNameForPartner));
 
