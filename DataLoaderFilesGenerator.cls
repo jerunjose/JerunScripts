@@ -4,7 +4,25 @@ public class DataLoaderFilesGenerator {
 	public static String insertJobSuffix = '_Insert';
 	public static String updateJobSuffix = '_Update';
 	public static String sandboxIdField = 'Record_Id_from_production__c';
+	public static set<String> setUpObjects = new set<String>();
+	public static set<String> objectsPreLoadedInSandbox = new set<String>();
 
+	private static set<String> objectsProcessed = new set<String>();
+	private static list<String> extractJobNames = new list<String>();
+	private static list<String> insertJobNames = new list<String>();
+	private static list<String> updateJobNames = new list<String>();
+
+	static{
+		// Not adding user object as portal users don't get carried over. These would also need to be loaded with external ids
+		//setUpObjects.add('User');
+		//setUpObjects.add('Group');
+		setUpObjects.add('RecordType');
+		setUpObjects.add('Profile');
+		setUpObjects.add('UserRole');
+		
+		objectsProcessed.addAll(objectsPreLoadedInSandbox);
+	}
+        
     class ObjectProcessResults{
         String SOQLQuery;
         String mappingFileForInsert;
@@ -28,12 +46,12 @@ public class DataLoaderFilesGenerator {
 		}
     }
     
-	public static String generateBeansForDataSet(Integer dataSetNumber, DataSet ds, ObjectProcessResults opr, list<String> dataLoaderJobNames, list<String> updateJobNames){
+	public static String generateBeansForDataSet(Integer dataSetNumber, DataSet ds, ObjectProcessResults opr){
 		String beansForDatSet = '';
 
 		// Create the bean for extract job
 		String extractJobName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+extractJobSuffix;
-		dataLoaderJobNames.add(extractJobName);
+		extractJobNames.add(extractJobName);
 		String extractFileName = extractJobName+'.csv';
 		String SOQLQueryWithFilters = opr.SOQLQuery + (ds.filterString == null ? '' : (' WHERE '+ds.filterString));
 		String extractJobBean = prepareExtractBean(extractJobName, ds.objAPIName, SOQLQueryWithFilters, extractFileName);
@@ -41,7 +59,7 @@ public class DataLoaderFilesGenerator {
 
 		// Create the bean for create job
 		String insertJobName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+insertJobSuffix;
-		dataLoaderJobNames.add(insertJobName);
+		insertJobNames.add(insertJobName);
 		String insertJobBean = prepareUpsertBean(insertJobName, ds.objAPIName, sandboxIdField, opr.mappingFileForInsert, extractFileName);
 		beansForDatSet+= insertJobBean;
 
@@ -73,6 +91,11 @@ public class DataLoaderFilesGenerator {
     
     public static String prepareExtractBean(String jobName, String objAPIName, String SOQLQuery, String FileName){
         String processConfFile = openBean(jobName);
+		processConfFile+= '\n\t\t\t\t<entry key="process.encryptionKeyFile" value="C:\\Users\\jerun\\dataloader\\v48.0.0\\dataLoader.key"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="sfdc.endpoint" value="https://login.salesforce.com"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="sfdc.username" value="jerun.stanley@ironfish.com.au"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="sfdc.password" value="7f4a4afb8e031a692e0aaae1c541eaccb33bf8470ec118b721a86adddffcb6d8cbfe869acd2ca00aa1e557bb964a79b786a85854aae90ba80b48739345c2bbc4"/>';
+
         processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="extract"/>';
         processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvWrite"/>';
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
@@ -84,6 +107,11 @@ public class DataLoaderFilesGenerator {
     
     public static String prepareUpsertBean(String jobName, String objAPIName, String externalIdField, String mappingFileName, String loadFileName){
         String processConfFile = openBean(jobName);
+		processConfFile+= '\n\t\t\t\t<entry key="process.encryptionKeyFile" value="C:\\Users\\jerun\\dataloader\\v48.0.0\\dataLoader.key"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="sfdc.endpoint" value="https://test.salesforce.com"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="sfdc.username" value="jerun.stanley@ironfish.com.au.datacopy"/>';
+		processConfFile+= '\n\t\t\t\t<entry key="sfdc.password" value="183db45565563ac52372c7a18899ef6db9d533d9df27a74d26a5c75bfbdd94b9b29708ffec20e2862a69debf7eb1774b6740d00f591c022f8214854de1229520"/>';
+
         processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="upsert"/>';
         processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvRead"/>';
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
@@ -127,12 +155,6 @@ public class DataLoaderFilesGenerator {
 	}
 	
     public static void processDataSets(list<DataSet> datasets){
-        set<String> setUpObjects = new set<String>();
-        // Not adding user object as portal users don't get carried over. These would also need to be loaded with external ids
-        //setUpObjects.add('User');
-        //setUpObjects.add('Group');
-        setUpObjects.add('RecordType');
-        
 		set<String> objectsToLoad = new set<String>();
         for(DataSet ds : datasets){
 			objectsToLoad.add(ds.objAPIName);
@@ -140,12 +162,11 @@ public class DataLoaderFilesGenerator {
 
         // Variables to hold the process results
         map<String, ObjectProcessResults> objProcessResultsMap = new map<String, ObjectProcessResults>();
-        String processConfFile = '<beans>';
+		String processConfFile = '<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">';
+        processConfFile+= '\n<beans>';
         list<ContentVersion> filesList = new list<ContentVersion>();
         // Begin processing
 		Integer dataSetNumber = 1;
-		list<String> dataLoaderJobNames = new list<String>();
-		list<String> updateJobNames = new list<String>();
 		for(DataSet ds : datasets){
 			String objAPIName =  ds.objAPIName;
 			ObjectProcessResults opr = objProcessResultsMap.get(objAPIName);
@@ -158,6 +179,9 @@ public class DataLoaderFilesGenerator {
 				for( String fieldName : fieldMap.KeySet() ) {
 					Schema.SObjectField fld = fieldMap.get(fieldName);
 					Schema.DescribeFieldResult dfr = fld.getDescribe();
+					// map contents are in lower case which gives trouble with the mapping file (case sensitive)
+					// best to reset it to the getName results
+					fieldName = dfr.getName();
 					if(dfr.isCreateable()){
 						if(dfr.getType() == Schema.DisplayType.REFERENCE){
 							String parentObjAPIName = String.ValueOf(dfr.getReferenceTo()[0]);
@@ -192,6 +216,7 @@ public class DataLoaderFilesGenerator {
 				// Add the mapping for the Id field to go to the SandboxId field in this.
 				mappingFileForInsert += '\nId'+'='+sandboxIdField;
 				
+				// Leave as empty to allow testing for emptiness
 				String mappingFileForUpdate = '';
 				if(!upsertFields.isEmpty()){
 					// Now process the upsert fields.
@@ -201,18 +226,28 @@ public class DataLoaderFilesGenerator {
 					// If not, add the field to an update mapping job which can be run after all the inserts are processed.
 					// All the fields that can be created have a direct mapping. These should all be simple input fields.
 					for(String fld : upsertFields){
+						
 						String relationshipFieldName;
 						if(fld.endsWithIgnoreCase('Id')){
 							relationshipFieldName = fld.removeEndIgnoreCase('Id');
 						}else{
 							relationshipFieldName = fld.replace('__c', '__r');
+							relationshipFieldName = fld.replace('__pc', '__pr');
 						}
-						String mappingString = '\n'+fld+'='+relationshipFieldName+'.'+sandboxIdField;
-						if(objProcessResultsMap.containsKey(fld)){
+						String mappingString = '\n'+fld+'='+relationshipFieldName+'\\:'+sandboxIdField;
+						
+						Schema.SObjectField fldToken = fieldMap.get(fld);
+						Schema.DescribeFieldResult dfr = fldToken.getDescribe();
+						String parentObjAPIName = String.ValueOf(dfr.getReferenceTo()[0]);
+						if(objProcessResultsMap.containsKey(parentObjAPIName)){
 							mappingFileForInsert += mappingString;
 						}else{
 							mappingFileForUpdate += mappingString;
 						}
+					}
+					if(!String.isEmpty(mappingFileForUpdate)){
+						// Add the mapping for the Id field to go to the SandboxId field in this.
+						mappingFileForUpdate += '\nId'+'='+sandboxIdField;
 					}
 				}
 				
@@ -239,13 +274,33 @@ public class DataLoaderFilesGenerator {
 					setUpObjects.add('Group');
 			}
 
-			processConfFile+= generateBeansForDataSet(dataSetNumber, ds, opr, dataLoaderJobNames, updateJobNames);
+			processConfFile+= generateBeansForDataSet(dataSetNumber, ds, opr);
 			dataSetNumber++;
         }
-		// Add all the update jobs after the extract and inserts are done
-		dataLoaderJobNames.addAll(updateJobNames);
         processConfFile+= '\n</beans>';
 		filesList.add(prepFile(processConfFile, 'process-conf.xml'));
+		// Process conf file generated
+
+        String batFileScript = 'C:';
+		// Add all the extracts first .. 
+		for(String jobName : extractJobNames){
+			batFileScript += '\ncd\\';
+			batFileScript += '\ncd C:\\Users\\jerun\\dataloader\\v48.0.0\\bin';
+			batFileScript += '\ncall process.bat "C:\\Users\\jerun\\dataloader\\v48.0.0\\downloaded-content" '+jobName+' > '+jobName+'Log.log';
+			batFileScript += '\necho '+jobName+' complete';
+		}
+		// Next - prompt and wait for confirmation that destination environment details has been updated in config.properties file
+		list<String> DMLJobNames = new list<String>();
+		// inserts first and then updates
+		DMLJobNames.addAll(insertJobNames);
+		DMLJobNames.addAll(updateJobNames);
+		for(String jobName : DMLJobNames){
+			batFileScript += '\ncd\\';
+			batFileScript += '\ncd C:\\Users\\jerun\\dataloader\\v48.0.0\\bin';
+			batFileScript += '\ncall process.bat "C:\\Users\\jerun\\dataloader\\v48.0.0\\downloaded-content" '+jobName+' > '+jobName+'Log.log';
+			batFileScript += '\necho '+jobName+' complete';
+		}
+		filesList.add(prepFile(batFileScript, 'runAllJobs.bat'));
 
         ContentWorkspace cw = [select id, RootContentFolderId from ContentWorkspace WHERE Name = 'Data Loader Config Files'];
         list<ContentDocument> filesToDelete = new list<ContentDocument>();
@@ -270,8 +325,8 @@ public class DataLoaderFilesGenerator {
         
         String URLToDownloadFrom = 'https://ironfish--tsaishen.my.salesforce.com/sfc/#search?searchWorkspaceIds=%5B%22'+cw.Id+'%22%5D';
         System.debug(URLToDownloadFrom);
-
-        // Note to self - Salesforce documentation says polymorphic lookups don't support external Id - which means that owner id would not support external Id.
+		
+		// Note to self - Salesforce documentation says polymorphic lookups don't support external Id - which means that owner id would not support external Id.
         // If this is the case, then what would happen if you delete the queue on lead object - not used so no impact? 
     }
 }
