@@ -24,18 +24,26 @@ public class DataLoaderFilesGenerator {
 	}
         
     class ObjectProcessResults{
-        String SOQLQuery;
+        String SOQLQueryForInsert;
+		String SOQLQueryForUpdate;
         String mappingFileForInsert;
         String mappingFileForUpdate;
     }
     
     class DataSet{
-        String objAPIName;
+        String title;
+		String objAPIName;
         String filterString;
 		// can also expand to input an external id field
 		// the set of objects can be converted to a map of objAPIName --> ext field
 		// this also drives the upsertFields to be a map of fld --> ext field which can then resolve the mapping file.
 		
+		public DataSet(String title, String objAPIName, String filterString){
+			this.title = title;
+			this.objAPIName = objAPIName;
+			this.filterString = filterString;
+		}
+
 		public DataSet(String objAPIName, String filterString){
 			this.objAPIName = objAPIName;
 			this.filterString = filterString;
@@ -50,10 +58,10 @@ public class DataLoaderFilesGenerator {
 		String beansForDatSet = '';
 
 		// Create the bean for extract job
-		String extractJobName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+extractJobSuffix;
+		String extractJobName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+extractJobSuffix+'_forInsert';
 		extractJobNames.add(extractJobName);
 		String extractFileName = extractJobName+'.csv';
-		String SOQLQueryWithFilters = opr.SOQLQuery + (ds.filterString == null ? '' : (' WHERE '+ds.filterString));
+		String SOQLQueryWithFilters = opr.SOQLQueryForInsert + (ds.filterString == null ? '' : (' WHERE '+ds.filterString));
 		String extractJobBean = prepareExtractBean(extractJobName, ds.objAPIName, SOQLQueryWithFilters, extractFileName);
 		beansForDatSet+= extractJobBean;
 
@@ -65,9 +73,16 @@ public class DataLoaderFilesGenerator {
 
 		// Create the bean for update job
 		if(!String.isEmpty(opr.mappingFileForUpdate)){
+			String extractForUpdateJobName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+extractJobSuffix+'_forUpdate';
+			extractJobNames.add(extractForUpdateJobName);
+			String extractFileNameForUpdate = extractForUpdateJobName+'.csv';
+			String SOQLQueryWithFiltersForUpdate = opr.SOQLQueryForUpdate + (ds.filterString == null ? '' : (' WHERE '+ds.filterString));
+			String extractJobBeanForUpdate = prepareExtractBean(extractForUpdateJobName, ds.objAPIName, SOQLQueryWithFiltersForUpdate, extractFileNameForUpdate);
+			beansForDatSet+= extractJobBeanForUpdate;
+
 			String updateJobName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+updateJobSuffix;
 			updateJobNames.add(updateJobName);
-			String updateJobBean = prepareUpsertBean(updateJobName, ds.objAPIName, sandboxIdField, opr.mappingFileForUpdate, extractFileName);
+			String updateJobBean = prepareUpsertBean(updateJobName, ds.objAPIName, sandboxIdField, opr.mappingFileForUpdate, extractFileNameForUpdate);
 			beansForDatSet+= updateJobBean;
 		}
 		return beansForDatSet;	
@@ -91,11 +106,6 @@ public class DataLoaderFilesGenerator {
     
     public static String prepareExtractBean(String jobName, String objAPIName, String SOQLQuery, String FileName){
         String processConfFile = openBean(jobName);
-		processConfFile+= '\n\t\t\t\t<entry key="process.encryptionKeyFile" value="C:\\Users\\jerun\\dataloader\\v48.0.0\\dataLoader.key"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="sfdc.endpoint" value="https://login.salesforce.com"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="sfdc.username" value="jerun.stanley@ironfish.com.au"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="sfdc.password" value="7f4a4afb8e031a692e0aaae1c541eaccb33bf8470ec118b721a86adddffcb6d8cbfe869acd2ca00aa1e557bb964a79b786a85854aae90ba80b48739345c2bbc4"/>';
-
         processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="extract"/>';
         processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvWrite"/>';
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
@@ -107,11 +117,6 @@ public class DataLoaderFilesGenerator {
     
     public static String prepareUpsertBean(String jobName, String objAPIName, String externalIdField, String mappingFileName, String loadFileName){
         String processConfFile = openBean(jobName);
-		processConfFile+= '\n\t\t\t\t<entry key="process.encryptionKeyFile" value="C:\\Users\\jerun\\dataloader\\v48.0.0\\dataLoader.key"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="sfdc.endpoint" value="https://test.salesforce.com"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="sfdc.username" value="jerun.stanley@ironfish.com.au.datacopy"/>';
-		processConfFile+= '\n\t\t\t\t<entry key="sfdc.password" value="183db45565563ac52372c7a18899ef6db9d533d9df27a74d26a5c75bfbdd94b9b29708ffec20e2862a69debf7eb1774b6740d00f591c022f8214854de1229520"/>';
-
         processConfFile+= '\n\t\t\t\t<entry key="process.operation" value="upsert"/>';
         processConfFile+= '\n\t\t\t\t<entry key="dataAccess.type" value="csvRead"/>';
         processConfFile+= '\n\t\t\t\t<entry key="sfdc.entity" value="'+objAPIName+'"/>';
@@ -134,13 +139,13 @@ public class DataLoaderFilesGenerator {
     public static void executeJob(){
 		list<DataSet> datasets = new list<DataSet>();
 		// 1. Insert account where IsPersonAccount = false
-        datasets.add(new DataSet('Account', 'IsPersonAccount = false'));
+        datasets.add(new DataSet('BusinessAccounts', 'Account', 'IsPersonAccount = false'));
 		// 2. Insert contact where IsPersonAccount = false --- tested that no staff records have a lookup to account that is a personaccount
         datasets.add(new DataSet('Contact', 'IsPersonAccount = false'));
 		// 3. Insert users where contactid != null --- tested that no user records have a lookup to contact that is a personaccount
         datasets.add(new DataSet('User', 'ContactId != null'));
 		// 4. Insert account where IsPersonAccount = true
-        datasets.add(new DataSet('Account', 'IsPersonAccount = true'));
+        datasets.add(new DataSet('Clients', 'Account', 'IsPersonAccount = true'));
 		// 5. Insert all other
 		datasets.add(new DataSet('Project_1__c'));
 		datasets.add(new DataSet('Property__c'));
@@ -169,113 +174,147 @@ public class DataLoaderFilesGenerator {
 		Integer dataSetNumber = 1;
 		for(DataSet ds : datasets){
 			String objAPIName =  ds.objAPIName;
-			ObjectProcessResults opr = objProcessResultsMap.get(objAPIName);
-			// If the object has not been processed yet.
-			if(opr == null){
-				Map<String, Schema.SObjectField> fieldMap = Schema.describeSObjects(new String[]{objAPIName})[0].fields.getMap();
-				set<String> insertFields = new set<String>();
-				set<String> upsertFields = new set<String>();
-				set<String> queryFields = new set<String>();
-				for( String fieldName : fieldMap.KeySet() ) {
-					Schema.SObjectField fld = fieldMap.get(fieldName);
-					Schema.DescribeFieldResult dfr = fld.getDescribe();
-					// map contents are in lower case which gives trouble with the mapping file (case sensitive)
-					// best to reset it to the getName results
-					fieldName = dfr.getName();
-					if(dfr.isCreateable()){
-						if(dfr.getType() == Schema.DisplayType.REFERENCE){
-							String parentObjAPIName = String.ValueOf(dfr.getReferenceTo()[0]);
-							if(setUpObjects.contains(parentObjAPIName)){
-								insertFields.add(fieldName);
-							}else if(objectsToLoad.contains(parentObjAPIName)){
-								upsertFields.add(fieldName);
-							}
-						}else{
-							insertFields.add(fieldName);
-						}
-					}
-				}
-				insertFields.remove(sandboxIdField);
-				
-				// Generate the SOQL String
-				queryFields.addAll(insertFields);
-				queryFields.addAll(upsertFields);
-				String SOQLSelectFields = 'Id';
-				for(String fld : queryFields){
-					SOQLSelectFields += ', '+fld;
-				}
-				String SOQLQuery = 'SELECT '+SOQLSelectFields+' FROM '+objAPIName;
-				
-				// Generate the insert mapping file
-				String mappingFileForInsert = '#Mapping values from source file (left) and upsert to Salesforce (right)';
-				// All the fields that can be created have a direct mapping. These should all be simple input fields.
-				// This also includes reference fields to users or groups which are available in the system and don't need mapping.
-				for(String fld : insertFields){
-					mappingFileForInsert += '\n'+fld+'='+fld;
-				}
-				// Add the mapping for the Id field to go to the SandboxId field in this.
-				mappingFileForInsert += '\nId'+'='+sandboxIdField;
-				
-				// Leave as empty to allow testing for emptiness
-				String mappingFileForUpdate = '';
-				if(!upsertFields.isEmpty()){
-					// Now process the upsert fields.
-					// The upsert fields are all lookup fields that have the parent objects within the scope of the data copy.
-					// If the object has already been processed, we should be able to map the field being loaded in the record create job.
-					// This will be needed if the object being loaded is a detail object.
-					// If not, add the field to an update mapping job which can be run after all the inserts are processed.
-					// All the fields that can be created have a direct mapping. These should all be simple input fields.
-					for(String fld : upsertFields){
-						
-						String relationshipFieldName;
-						if(fld.endsWithIgnoreCase('Id')){
-							relationshipFieldName = fld.removeEndIgnoreCase('Id');
-						}else{
-							relationshipFieldName = fld.replace('__c', '__r');
-							relationshipFieldName = fld.replace('__pc', '__pr');
-						}
-						String mappingString = '\n'+fld+'='+relationshipFieldName+'\\:'+sandboxIdField;
-						
-						Schema.SObjectField fldToken = fieldMap.get(fld);
-						Schema.DescribeFieldResult dfr = fldToken.getDescribe();
+			Map<String, Schema.SObjectField> fieldMap = Schema.describeSObjects(new String[]{objAPIName})[0].fields.getMap();
+			set<String> insertFields = new set<String>();
+			set<String> upsertFields = new set<String>();
+			set<String> queryFields = new set<String>();
+			for( String fieldName : fieldMap.KeySet() ) {
+				Schema.SObjectField fld = fieldMap.get(fieldName);
+				Schema.DescribeFieldResult dfr = fld.getDescribe();
+				// map contents are in lower case which gives trouble with the mapping file (case sensitive)
+				// best to reset it to the getName results
+				fieldName = dfr.getName();
+				if(dfr.isCreateable()){
+					if(dfr.getType() == Schema.DisplayType.REFERENCE){
 						String parentObjAPIName = String.ValueOf(dfr.getReferenceTo()[0]);
-						if(objProcessResultsMap.containsKey(parentObjAPIName)){
-							mappingFileForInsert += mappingString;
-						}else{
-							mappingFileForUpdate += mappingString;
+						if(setUpObjects.contains(parentObjAPIName)){
+							insertFields.add(fieldName);
+						}else if(objectsToLoad.contains(parentObjAPIName)){
+							upsertFields.add(fieldName);
 						}
-					}
-					if(!String.isEmpty(mappingFileForUpdate)){
-						// Add the mapping for the Id field to go to the SandboxId field in this.
-						mappingFileForUpdate += '\nId'+'='+sandboxIdField;
+					}else{
+						insertFields.add(fieldName);
 					}
 				}
-				
-				String insertMappingFileName = objAPIName+insertJobSuffix+'.sdl';
-				filesList.add(prepFile(mappingFileForInsert, insertMappingFileName));
-
-				String updateMappingFileName;
-				if(!String.isEmpty(mappingFileForUpdate)){
-					updateMappingFileName = objAPIName+updateJobSuffix+'.sdl';
-					filesList.add(prepFile(mappingFileForUpdate, updateMappingFileName));
+			}
+			insertFields.remove(sandboxIdField);
+			if(ds.title == 'BusinessAccounts'){
+				set<String> actualInsertFields = new set<String>();
+				for(String fld : insertFields){
+					if(!fld.endsWithIgnoreCase('__pc')){
+						actualInsertFields.add(fld);
+					}
 				}
-            
-				// All the processing for this object is done. Lets mark it as complete.
-				// This would mean that any reference to this object can be marked in the insert jobs.
-				opr = new ObjectProcessResults();
-				opr.SOQLQuery = SOQLQuery;
-				opr.mappingFileForInsert = insertMappingFileName;
-				opr.mappingFileForUpdate = updateMappingFileName;
-				
-				objProcessResultsMap.put(objAPIName, opr);
-
-				// When user records have been processed, it is safe to perform polymorphic lookups for user and queue objects
-				if(objAPIName == 'User')
-					setUpObjects.add('Group');
+				insertFields = actualInsertFields;
+				set<String> actualUpdateFields = new set<String>();
+				for(String fld : upsertFields){
+					if(!fld.endsWithIgnoreCase('__pc')){
+						actualUpdateFields.add(fld);
+					}
+				}
+				upsertFields = actualUpdateFields;
+			}else if(ds.title == 'Clients'){
+				insertFields.remove('Name');
 			}
 
+			// Generate the SOQL Strings
+			String SOQLSelectFields = 'Id';
+			for(String fld : insertFields){
+				SOQLSelectFields += ', '+fld;
+			}
+			String SOQLQueryForInsert = 'SELECT '+SOQLSelectFields+' FROM '+objAPIName;
+			SOQLSelectFields = 'Id';
+			for(String fld : upsertFields){
+				SOQLSelectFields += ', '+fld;
+			}
+			String SOQLQueryForUpdate = 'SELECT '+SOQLSelectFields+' FROM '+objAPIName;
+			
+			// Generate the insert mapping file
+			String mappingFileForInsert = '#Mapping values from source file (left) and upsert to Salesforce (right)';
+			// All the fields that can be created have a direct mapping. These should all be simple input fields.
+			// This also includes reference fields to users or groups which are available in the system and don't need mapping.
+			for(String fld : insertFields){
+				mappingFileForInsert += '\n'+fld+'='+fld;
+			}
+			// Add the mapping for the Id field to go to the SandboxId field in this.
+			mappingFileForInsert += '\nId'+'='+sandboxIdField;
+			
+			// Leave as empty to allow testing for emptiness
+			String mappingFileForUpdate = '';
+			if(!upsertFields.isEmpty()){
+				// Now process the upsert fields.
+				// The upsert fields are all lookup fields that have the parent objects within the scope of the data copy.
+				// If the object has already been processed, we should be able to map the field being loaded in the record create job.
+				// This will be needed if the object being loaded is a detail object.
+				// If not, add the field to an update mapping job which can be run after all the inserts are processed.
+				// All the fields that can be created have a direct mapping. These should all be simple input fields.
+				for(String fld : upsertFields){
+					String relationshipFieldName;
+					if(fld.endsWithIgnoreCase('Id')){
+						relationshipFieldName = fld.removeEndIgnoreCase('Id');
+					}else{
+						relationshipFieldName = fld.replace('__c', '__r');
+						relationshipFieldName = fld.replace('__pc', '__pr');
+					}
+					String mappingString = '\n'+fld+'='+relationshipFieldName+'\\:'+sandboxIdField;
+					
+					Schema.SObjectField fldToken = fieldMap.get(fld);
+					Schema.DescribeFieldResult dfr = fldToken.getDescribe();
+					String parentObjAPIName = String.ValueOf(dfr.getReferenceTo()[0]);
+					if(objectsProcessed.contains(parentObjAPIName)){
+						mappingFileForInsert += mappingString;
+					}else{
+						mappingFileForUpdate += mappingString;
+					}
+				}
+				if(!String.isEmpty(mappingFileForUpdate)){
+					// Add the mapping for the Id field to go to the SandboxId field in this.
+					mappingFileForUpdate += '\nId'+'='+sandboxIdField;
+				}
+			}
+
+			String insertMappingFileName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+insertJobSuffix+'.sdl';
+			filesList.add(prepFile(mappingFileForInsert, insertMappingFileName));
+
+			String updateMappingFileName;
+			if(!String.isEmpty(mappingFileForUpdate)){
+				updateMappingFileName = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+ds.objAPIName+updateJobSuffix+'.sdl';
+				filesList.add(prepFile(mappingFileForUpdate, updateMappingFileName));
+			}
+		
+			// All the processing for this object is done. Lets mark it as complete.
+			// This would mean that any reference to this object can be marked in the insert jobs.
+			ObjectProcessResults opr = new ObjectProcessResults();
+			opr.SOQLQueryForInsert = SOQLQueryForInsert;
+			opr.SOQLQueryForUpdate = SOQLQueryForUpdate;
+			opr.mappingFileForInsert = insertMappingFileName;
+			opr.mappingFileForUpdate = updateMappingFileName;
+			
+			// When user records have been processed, it is safe to perform polymorphic lookups for user and queue objects
+			if(objAPIName == 'User')
+				setUpObjects.add('Group');
+			
 			processConfFile+= generateBeansForDataSet(dataSetNumber, ds, opr);
+
+			objectsProcessed.add(objAPIName);
 			dataSetNumber++;
+			
+			// For business accounts we need to activate them on an update call
+			if(ds.title == 'BusinessAccounts'){
+				DataSet partnerAccountsDataSet = new DataSet('Account', 'IsPartner = true');
+				String insertMappingFileNameForPartner = 'DataSet_'+String.ValueOf(dataSetNumber)+'_'+partnerAccountsDataSet.objAPIName+insertJobSuffix+'.sdl';
+				String mappingFileData = '#Mapping values from source file (left) and upsert to Salesforce (right)';
+				mappingFileData += '\nIsPartner=nIsPartner';
+				mappingFileData += '\nId'+'='+sandboxIdField;
+				filesList.add(prepFile(mappingFileData, insertMappingFileNameForPartner));
+
+				ObjectProcessResults oprForPartnerAccounts = new ObjectProcessResults();
+				oprForPartnerAccounts.SOQLQueryForInsert = 'SELECT Id, IsPartner FROM Account';
+				oprForPartnerAccounts.mappingFileForInsert = insertMappingFileNameForPartner;
+			
+				processConfFile+= generateBeansForDataSet(dataSetNumber, partnerAccountsDataSet, oprForPartnerAccounts);
+				dataSetNumber++;
+			}
         }
         processConfFile+= '\n</beans>';
 		filesList.add(prepFile(processConfFile, 'process-conf.xml'));
@@ -323,10 +362,10 @@ public class DataLoaderFilesGenerator {
         }
         insert cdlList;
         
-        String URLToDownloadFrom = 'https://ironfish--tsaishen.my.salesforce.com/sfc/#search?searchWorkspaceIds=%5B%22'+cw.Id+'%22%5D';
+        String URLToDownloadFrom = URL.getSalesforceBaseUrl().toExternalForm()+'/sfc/#search?searchWorkspaceIds=%5B%22'+cw.Id+'%22%5D';
         System.debug(URLToDownloadFrom);
-		
-		// Note to self - Salesforce documentation says polymorphic lookups don't support external Id - which means that owner id would not support external Id.
+
+        // Note to self - Salesforce documentation says polymorphic lookups don't support external Id - which means that owner id would not support external Id.
         // If this is the case, then what would happen if you delete the queue on lead object - not used so no impact? 
     }
 }
