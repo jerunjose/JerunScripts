@@ -4,7 +4,7 @@ Schema.DescribeSObjectResult R = recordId.getSObjectType().getDescribe();
 List<Schema.ChildRelationship> C = R.getChildRelationships();
 system.debug(c.size());
 
-Integer startInt = 129;
+Integer startInt = 0;
 integer endInt = 250;
 
 endInt  = math.min(endInt, c.size());
