@@ -1,3 +1,64 @@
+R9SrNZ3Z5xS4P4k!
+uIy1XKJLPq3kYmc7EKdN1yXM
+
+R9SrNZ3Z5xS4P4k!uIy1XKJLPq3kYmc7EKdN1yXM
+
+
+
+delete [SELECT id FROM Application_Log__c WHERE Exception_Reason__c = 'No active duplicate rules are defined for the Contact object type.'];
+delete [SELECT Id, Name, Scan_Job_Identifier__c, RecordCount FROM DuplicateRecordSet WHERE Scan_Job_Identifier__c = 'DupeScan_2020_05_12_11_11_id_557'];
+
+
+DuplicateRulesRescanBatch job = new DuplicateRulesRescanBatch();
+List<sObject> scope = [SELECT Id FROM Lead WHERE Id IN ('00Q0O000015z3GgUAI', '00Q0O000015z3GlUAI')];
+job.processRecordList(scope);
+
+
+list<Id> recordIdList = new list<Id>();
+recordIdList.add('00Q0O000015z3GgUAI');
+recordIdList.add('00Q0O000015z3GlUAI');
+List<Datacloud.FindDuplicatesResult> findResults = Datacloud.FindDuplicatesByIds.findDuplicatesByIds(recordIdList);
+system.debug(JSON.serialize(findResults));
+
+
+
+list<Id> recordIdList = new list<Id>();
+recordIdList.add('00320000017j0sxAAA');
+List<Datacloud.FindDuplicatesResult> findResults = Datacloud.FindDuplicatesByIds.findDuplicatesByIds(recordIdList);
+system.debug(JSON.serialize(findResults));
+
+
+list<AggregateResult> agrList = [SELECT count(id) cnt, email eml FROM Contact where CRM_User_Account_User_Id__c = null and IsPersonAccount = true group by Email];
+for(AggregateResult agr : agrList){
+	Decimal cnt = (Decimal)agr.get('cnt');
+	if(cnt > 1){
+		system.debug('Email = '+agr.get('eml')+' with count '+cnt);
+	}
+}
+
+
+
+DuplicateRulesRescanBatch job = new DuplicateRulesRescanBatch();
+job.objectAPIName = 'Lead';
+job.whereClause = ' IsConverted  = false';
+DataBase.executeBatch(job,40);
+
+
+DuplicateRulesRescanBatch job = new DuplicateRulesRescanBatch();
+job.objectAPIName = 'Account';
+job.whereClause = ' ispersonaccount = true';
+DataBase.executeBatch(job,40);
+
+list<DuplicateRecordItem> driList = [SELECT RecordId FROM DuplicateRecordItem WHERE DuplicateRecordSet.Scan_Job_Identifier__c = 'DupeScan_2020_05_12_12_39_id_906'];
+set<Id> recIds = new set<Id>();
+for(DuplicateRecordItem dri : driList){
+    recIds.add(dri.RecordId);
+}
+map<Id, Contact> contMap = new map<Id, Contact>([SELECT Id, AccountId FROM Contact WHERE Id = :recIds]);
+for(DuplicateRecordItem dri : driList){
+    dri.Client__c = contMap.get(dri.RecordId).AccountId;
+}
+update driList;
 
 --------------- Script to find case team member where region is different -------------
 list<CCMS_Case_Team_Member__c> ctmList = [SELECT Id, Case__c, Region__c, Regional_Officer__c, Regional_Officer__r.User__c, User__c FROM CCMS_Case_Team_Member__c where Regional_Officer__c != null];
