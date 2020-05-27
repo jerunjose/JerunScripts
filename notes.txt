@@ -1,3 +1,53 @@
+select id, personcontactid, personemail, hubspot_contact_id__pc, Hubspot_Sync_Date__pc from account where ispersonaccount = true and hubspot_contact_id__pc != null
+
+select id, email, hubspot_contact_id__c, Hubspot_Sync_Date__c from lead where hubspot_contact_id__c != null
+
+-----------------------------------------------
+
+list<account> accList = [select id, (select id from ActivityHistories  where CreatedById = '0050O000008lmGE' LIMIT 1) from account where Hubspot_Contact_ID__pc != null];
+set<Id> accIds = new set<Id>();
+for(account acc : accList){
+	if(acc.ActivityHistories.isEmpty())
+		accIds.add(acc.Id);
+}
+system.debug(accIds.size());
+
+set<Id> convertedAccIds = new set<Id>();
+for(Lead ld : [select ConvertedAccountId from lead where isconverted = true]){
+	convertedAccIds.add(ld.ConvertedAccountId);
+}
+accIds.removeAll(convertedAccIds);
+system.debug(accIds.size());
+
+-----------------------------------------------
+
+
+list<AccountHistory> accHistList = [SELECT Id, AccountId, Field, OldValue, NewValue, CreatedById FROM AccountHistory where CreatedById = '0050O000008lmGE' and field in ('PersonEmail', 'FirstName', 'LastName')];
+set<Id> fnchanged = new set<Id>();
+set<Id> lnchanged = new set<Id>();
+set<Id> emailChanged = new set<Id>();
+for(AccountHistory acc : accHistList){
+    if(acc.OldValue != null){
+        if(acc.Field == 'FirstName')
+            fnchanged.add(acc.AccountId);
+        if(acc.Field == 'LastName')
+            lnchanged.add(acc.AccountId);
+        if(acc.Field == 'PersonEmail')
+            emailChanged.add(acc.AccountId);
+    }
+}
+set<Id> allAccountIds = new set<Id>();
+for(Id accId : emailChanged){
+    if(fnchanged.contains(accId) && lnchanged.contains(accId))
+        allAccountIds.add(accId);
+}
+system.debug(allAccountIds);
+system.debug(allAccountIds.size());
+
+
+---------------------------------------
+
+
 R9SrNZ3Z5xS4P4k!
 uIy1XKJLPq3kYmc7EKdN1yXM
 
@@ -7,6 +57,8 @@ R9SrNZ3Z5xS4P4k!uIy1XKJLPq3kYmc7EKdN1yXM
 
 delete [SELECT id FROM Application_Log__c WHERE Exception_Reason__c = 'No active duplicate rules are defined for the Contact object type.'];
 delete [SELECT Id, Name, Scan_Job_Identifier__c, RecordCount FROM DuplicateRecordSet WHERE Scan_Job_Identifier__c = 'DupeScan_2020_05_12_11_11_id_557'];
+
+delete [SELECT Id, Name, Scan_Job_Identifier__c, RecordCount FROM DuplicateRecordSet WHERE DuplicateRule.Name = 'Lead & Clients - Exact Email OR Exact Phone'];
 
 
 DuplicateRulesRescanBatch job = new DuplicateRulesRescanBatch();
@@ -48,6 +100,8 @@ DuplicateRulesRescanBatch job = new DuplicateRulesRescanBatch();
 job.objectAPIName = 'Account';
 job.whereClause = ' ispersonaccount = true';
 DataBase.executeBatch(job,40);
+
+Lead & Clients - Exact Email OR Exact Phone
 
 list<DuplicateRecordItem> driList = [SELECT RecordId FROM DuplicateRecordItem WHERE DuplicateRecordSet.Scan_Job_Identifier__c = 'DupeScan_2020_05_12_12_39_id_906'];
 set<Id> recIds = new set<Id>();
