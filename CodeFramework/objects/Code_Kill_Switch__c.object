@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customSettingsType>Hierarchy</customSettingsType>
+    <description>A set of checkboxes that let the admin turn off any logic elements implemented.</description>
+    <enableFeeds>false</enableFeeds>
+    <fields>
+        <fullName>Account_someRandomMethod__c</fullName>
+        <defaultValue>false</defaultValue>
+        <externalId>false</externalId>
+        <label>Account_someRandomMethod</label>
+        <trackTrending>false</trackTrending>
+        <type>Checkbox</type>
+    </fields>
+    <label>Code Kill Switch</label>
+    <visibility>Public</visibility>
+</CustomObject>

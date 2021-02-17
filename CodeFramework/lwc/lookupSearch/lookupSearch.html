@@ -1,0 +1,36 @@
+<template>
+    <div class="slds-form-element slds-m-around_medium">
+        <label class="slds-form-element__label" for="combobox-id-2">{label}</label>
+        <div class="slds-form-element__control">
+            <div class="slds-combobox_container">
+                <div class="slds-combobox slds-dropdown-trigger slds-dropdown-trigger_click slds-is-open" aria-expanded="true" aria-haspopup="listbox" role="combobox">
+                    <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right" role="none">
+                        <input minlength="3" type="text" class="slds-input slds-has-focus"
+                            aria-autocomplete="list" aria-controls="listbox-id-2" role="textbox"
+                            onkeyup={handleKeyChange} placeholder="Search..." autocomplete="off" 
+                        />
+                        <lightning-icon icon-name="utility:search" size="x-small" class="slds-input__icon slds-input__icon_right"></lightning-icon>
+                    </div>
+                    <template if:true={showoptions}>
+                        <div id="listbox-id-2" class="slds-dropdown slds-dropdown_length-with-icon-7 slds-dropdown_fluid" role="listbox">
+                            <ul class="slds-listbox slds-listbox_vertical" role="presentation">
+                                <template for:each={records} for:item="record">
+                                    <c-lookup-search-result-item 
+                                        key={record.Id} 
+                                        record={record} 
+                                        subtitle-fields={subtitleFields} 
+                                        title-field={titleField}
+                                        onlookupselect={handlelookupselect}>
+                                    </c-lookup-search-result-item>
+                                </template>
+                            </ul>
+                        </div>
+                    </template>
+                    <div if:true={noRecordsFlag} class="slds-m-top_medium">
+                        <p>Unable to find any results for '{searchString}'</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,5 @@
+<template>
+    <template if:true={apexResponse.isException}>
+        <c-error-message-display error-obj={apexResponse.exceptionRespObj}></c-error-message-display>
+    </template>
+</template>

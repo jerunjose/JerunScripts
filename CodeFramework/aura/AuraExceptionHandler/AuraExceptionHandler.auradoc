@@ -1,0 +1,8 @@
+<aura:documentation>
+	<aura:description>
+        A generic lightning component to handle aura exceptions gracefully by returning a toast message.<br/>
+        Used the answer provided to the question at <a href="https://salesforce.stackexchange.com/questions/176979/best-practice-for-catching-and-displaying-action-errors-in-lightning-components/177007#answer-177007">StackExchange</a> to implement this component.<br/>
+        Implemented a basic try catch logic on top of the code to handle any errors in the callback function.
+        This allows for handling error messages when the component is used outside of the one.app context
+    </aura:description>
+</aura:documentation>

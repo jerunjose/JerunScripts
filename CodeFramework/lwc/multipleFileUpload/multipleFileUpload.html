@@ -1,0 +1,45 @@
+<template>
+    <button onclick={addRow} disabled={addButtonDisabled} class="slds-button slds-button_neutral slds-m-top_x-small">Add another file</button>
+
+    <div class={containerCSS}>
+        <template if:true={showError}>
+            <div data-error-message="true" aria-live="assertive" class="slds-form-element__help slds-m-left_small">{errorMessage}</div>
+        </template>
+        <table class="slds-table slds-table_bordered slds-m-top_x-small"> 
+            <tbody>
+                <template for:each={filesList} for:item='fl' for:index='index'>
+                    <tr key={fl.Id}>
+                        <td>
+                            <template if:true={fl.allowRowDelete}>
+                                <a onclick={removeRow} data-record={index}>
+                                    <lightning-icon
+                                        icon-name="action:remove" 
+                                        title="Remove Row"
+                                        alternative-text="Remove Row" 
+                                        size="x-small">
+                                    </lightning-icon>
+                                    <span class="slds-assistive-text">Remove Row</span>
+                                </a>
+                            </template>
+                        </td>
+                        <td>
+                            <c-single-file-upload
+                                data-file-index={index}
+                                disable-soft-delete-for-init-file={disableSoftDeleteForInitFile}
+                                disable-delete={disableDelete}
+                                instance-id={fl.instanceId}
+                                accept={accept}
+                                record-id={recordId}
+                                file-document-id={fl.fileDocumentId}
+                                file-name={fl.fileName}
+                                file-uploaded-by={fl.fileUploadedBy}
+                                file-uploaded-date={fl.fileUploadedDate}
+                                onfilechange={handleFileChange}>
+                            </c-single-file-upload>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</template>

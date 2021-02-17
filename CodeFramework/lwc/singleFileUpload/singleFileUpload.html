@@ -1,0 +1,41 @@
+<template>
+    <template if:true={loadFinished}>
+        <c-apex-exception-handler apex-response={ApexResponse}></c-apex-exception-handler>
+        <div class={containerCSS}>
+            <lightning-file-upload
+                label={label}
+                accept={accept}
+                record-id={recordId}
+                onuploadfinished={handleUploadFinished}
+                disabled={isFileLoaded}>
+            </lightning-file-upload>
+
+            <template if:true={isFileLoaded}>
+                <div style="max-width: 17em; word-break: break-all;">
+                    <template if:false={disableDelete}>
+                        <a onclick={deleteFile}>
+                            <lightning-icon
+                                icon-name="utility:delete" 
+                                title="Delete" 
+                                alternative-text="Delete" 
+                                size="x-small" 
+                                class="slds-m-bottom_xx-small slds-m-right_xx-small">
+                            </lightning-icon>
+                        </a>
+                    </template>
+                    <template if:true={fileUploadedByAvailable}>
+                        <a href={fileDownloadURL}>
+                            {fileName}
+                        </a> uploaded by {fileUploadedBy} at {fileUploadedDate}
+                    </template>
+                    <template if:false={fileUploadedByAvailable}>
+                        <a href={fileDownloadURL}>{fileDownloadTitle}</a>
+                    </template>
+                </div>
+            </template>
+            <template if:true={showError}>
+                <div data-error-message="true" aria-live="assertive" class="slds-form-element__help slds-m-left_small">{errorMessage}</div>
+            </template>
+        </div>
+    </template>
+</template>

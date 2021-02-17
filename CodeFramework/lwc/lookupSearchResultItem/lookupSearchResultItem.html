@@ -1,0 +1,11 @@
+<template>  
+    <li role="presentation" class="slds-listbox__item" key={record.Id}>
+        <div class="slds-media slds-listbox__option slds-listbox__option_entity slds-listbox__option_has-meta"
+            key={record.Id} data-contact-id={record.Id} onclick={handleSelect} role="option">
+            <span class="slds-media__body">
+                <span class="slds-listbox__option-text slds-listbox__option-text_entity">{titleValue}</span>
+                <span if:true={subtitleValue} class="slds-listbox__option-meta slds-listbox__option-meta_entity">{subtitleValue}</span>
+            </span>
+        </div>
+    </li>
+</template>
